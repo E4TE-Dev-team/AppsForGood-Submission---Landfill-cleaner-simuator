@@ -12,10 +12,6 @@ from pymunk import Vec2d
 
 def main():
 
-
-
-    hello()
-
     pygame.init()
     screen = pygame.display.set_mode((600, 600))
     clock = pygame.time.Clock()
@@ -24,5 +20,5 @@ def main():
     ### Physics stuff
     space = pymunk.Space()
     space.gravity = Vec2d(0.0, -900.0)
-
-
+    
+    exec("hello.py")
