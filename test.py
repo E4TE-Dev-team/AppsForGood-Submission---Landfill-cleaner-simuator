@@ -21,4 +21,8 @@ def main():
     space = pymunk.Space()
     space.gravity = Vec2d(0.0, -900.0)
     
-    zoo_level = [{"x" : 0},{"y" : 0},{"z" : 0}]
+    zoo_level = [
+    [{"x" : 0},{"y" : 0},{"z" : 0},{"r" : 0},{"type" : "block"},{"texture" : "test"}]
+
+
+    ]
