@@ -47,7 +47,7 @@ def main():
     ]
     #level geometry pymunk.Body
     world = pymunk.Body()
-    world.__init__(0,0,STATIC)
+    world.__init__(0,0, pymunk.Body.STATIC)
     space.add(world)
 
 
@@ -56,3 +56,7 @@ def main():
         getinput(space)
         update(space)
         draw(space)
+
+
+
+main()
