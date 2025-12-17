@@ -11,7 +11,8 @@ from pymunk import Vec2d
 
 
 
-def getinput():
+def getinput(space):
+    
     return 0
 
 def update(space):
@@ -52,6 +53,6 @@ def main():
 
 
     while running == True:
-        getinput()
+        getinput(space)
         update(space)
         draw(space)
