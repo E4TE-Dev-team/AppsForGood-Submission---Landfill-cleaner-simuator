@@ -18,12 +18,12 @@ def update(space):
     return 0
 
 def draw(space):
-    shapeinworldgeometry = 5
+    #shapeinworldgeometry = 5
     #tmp var
 
-    if shapeinworldgeometry.pos() > playerxpos+50 and shapeinworldgeometry.pos() > playerypos+50:
-        #skip because it is too far away
-        pass
+    #if shapeinworldgeometry.pos() > playerxpos+50 and shapeinworldgeometry.pos() > playerypos+50:
+    #    #skip because it is too far away
+    #    pass
 
 
     return 0
