@@ -20,6 +20,7 @@ def getinput(space):
     return 0
 
 def update(space):
+    
     return 0
 
 def draw(space):
