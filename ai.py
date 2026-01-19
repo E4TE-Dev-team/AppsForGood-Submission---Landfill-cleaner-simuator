@@ -5,7 +5,7 @@ from pymunk import Vec2d
 
 # Configuration
 WIDTH, HEIGHT = 800, 600
-FPS = 60
+FPS = 700
 
 # Simplified level data (Y is inverted for Pygame: 0 is top)
 zoo_level = [
