@@ -1,4 +1,5 @@
 import os.path
+import argparse
 
 import pygame
 import pymunk
@@ -6,6 +7,12 @@ import pymunk.pygame_util
 from pymunk import Vec2d
 import pymunk.bb
 
+parser = argparse.ArgumentParser()
+parser.add_argument("-d", "--debug", help="debug mode", action="store_true")
+args = parser.parse_args()
+debug = False
+if args.debug:
+    debug = True
 # Configuration
 WIDTH, HEIGHT = 800, 600
 FPS = 120
@@ -17,7 +24,8 @@ def getimg(name):
 zoo_level = [
     {"x": 100, "y": 500, "w": 600, "h": 50, "type": "block"}, # Floor
     {"x": 0,   "y": 400, "w": 300, "h": 50, "type": "block"}, # Platform
-    {"x": 50,  "y": 450, "w": 300, "h": 50, "type": "block"}, # step
+    {"x": 50,  "y": 450, "w": 300, "h": 50, "type": "block"}, # Step
+    {"x": 0,   "y": 300, "w": 300, "h": 50, "type": "block"}, # Roof
 ]
 bottle_img = getimg("bottle.png")
 
@@ -87,6 +95,21 @@ def main():
         # 1. Input
         getinput(player)
 
+        # if player out of bounds, reset 
+        if player.body.position.y > HEIGHT:
+            print("Player velocity: ", player.body.velocity)
+            print("Player angular velocity: ", player.body.angular_velocity)
+            print("Player angle: ", player.body.angle)
+            player.body.position = (400, 488)
+            player.body.velocity = (0, 0)
+            player.body.angular_velocity = 0
+            player.body.angle = 0
+            print("Player fell out of the world!")
+            print("Resetting player to (400, 488)")
+            print("Player velocity: ", player.body.velocity)
+            print("Player angular velocity: ", player.body.angular_velocity)
+            print("Player angle: ", player.body.angle)
+
         # 2. Physics Update
         dt = 0.01 / FPS
         for i in range(100):
@@ -99,16 +122,17 @@ def main():
             pygame.draw.rect(screen, (101, 67, 33), (item["x"], item["y"], item["w"], item["h"]))
 
         # Display fps
-        fps = "FPS: " + str(clock.get_fps())
+        fps = "FPS: " + str(int(clock.get_fps()))
         y = 5
         font = pygame.font.Font(None, 16)
         text = font.render(fps, True, pygame.Color("black"))
         screen.blit(text, (5, y))
 
-        screen.blit(bottle_img, player.body.position-Vec2d(20,20))
+        screen.blit(bottle_img, player.body.position-Vec2d(17,20))
 
         # Draw Player (using pymunk helper for simplicity)
-        space.debug_draw(draw_options)
+        if debug == True:
+            space.debug_draw(draw_options)
 
         pygame.display.flip()
         clock.tick(FPS)
@@ -118,4 +142,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
