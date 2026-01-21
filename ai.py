@@ -162,7 +162,7 @@ def main():
             if item.body.position.y > HEIGHT:
                 space.remove(item.body, item)
                 items.remove(item)
-            elif item.body.position <= player.body.position+Vec2d(5, 0) and item.body.position >= player.body.position-Vec2d(5, 0):
+            elif item.body.position <= player.body.position+Vec2d(10, 0) and item.body.position >= player.body.position-Vec2d(10, 0):
                 space.remove(item.body, item)
                 items.remove(item)
                 print("Bottle collected!")
@@ -182,4 +182,3 @@ def main():
 
 if __name__ == "__main__":
     main()
- 
