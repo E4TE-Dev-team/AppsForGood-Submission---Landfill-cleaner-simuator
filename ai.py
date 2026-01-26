@@ -13,6 +13,7 @@ args = parser.parse_args()
 debug = False
 if args.debug:
     debug = True
+
 # Configuration
 WIDTH, HEIGHT = 800, 600
 FPS = 120
@@ -27,7 +28,8 @@ zoo_level = [
     {"x": 100, "y": 500, "w": 600, "h": 50, "type": "block"}, # Floor
     {"x": 0,   "y": 400, "w": 300, "h": 50, "type": "block"}, # Platform
     {"x": 50,  "y": 450, "w": 300, "h": 50, "type": "block"}, # Step
-    {"x": 0,   "y": 350, "w": 300, "h": 50, "type": "block"}, # Roof
+    {"x": 0,   "y": 300, "w": 300, "h": 50, "type": "block"}, # Roof
+    {"x": 428, "y": 350, "w": 75,  "h": 50, "type": "block"}, # platforming block
 ]
 bottle_img = getimg("bottle.png")
 player_img = getimg("player.png")
@@ -63,7 +65,7 @@ def getinput(player_shape, isreversed):
     keys = pygame.key.get_pressed()
     v = player_shape.body.velocity
     player_shape.body.angle = 0
-    
+
     if keys[pygame.K_LEFT]:
         player_shape.body.velocity = (-200, v.y)
         isreversed = True
@@ -121,8 +123,14 @@ def main(playerdirection):
     player = create_player(space, (400, 100))
     items = create_bottles(space)
 
+    last_grounded_time = 0
+    coyote_time = 0.15
+    jump_velocity = -400
+    is_jumping = False
+    
     running = True
     while running:
+        current_time = pygame.time.get_ticks() /1000.0
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -145,6 +153,24 @@ def main(playerdirection):
             print("Player angular velocity: ", player.body.angular_velocity)
             print("Player angle: ", player.body.angle)
 
+        v = player.body.velocity
+        if abs(v.y) < 1.0:
+            last_grounded_time = current_time
+            is_jumping = False
+
+        keys = pygame.key.get_pressed()
+
+        # Jump logic: Coyote time and Variable jump height
+        if keys[pygame.K_UP]:
+            if current_time - last_grounded_time < coyote_time and not is_jumping:
+                player.body.velocity = (v.x, jump_velocity)
+                is_jumping = True
+        else:
+            # If button released while rising, cut vertical velocity to allow short jumps
+            if is_jumping and v.y < -100:
+                player.body.velocity = (v.x, -100)
+                is_jumping = False
+
         # 2. Physics Update
         num = 150
         phy = (1/num)
@@ -154,11 +180,13 @@ def main(playerdirection):
             space.step(dt)
             player.body.angle = 0
         # 3. Drawing
+        camera_offset = Vec2d(WIDTH / 2 - player.body.position.x, HEIGHT / 2 - player.body.position.y)
+        
         screen.fill((200, 230, 255)) # Sky Blue
 
         # Draw Platforms
         for item in zoo_level:
-            pygame.draw.rect(screen, (101, 67, 33), (item["x"], item["y"], item["w"], item["h"]))
+            pygame.draw.rect(screen, (101, 67, 33), (item["x"] + camera_offset.x, item["y"] + camera_offset.y, item["w"], item["h"]))
 
         # Display fps
         fps = "FPS: " + str(int(clock.get_fps()))
@@ -171,9 +199,9 @@ def main(playerdirection):
         screen.blit(bottle_text, (5, y+10))
 
         if playerdirection:
-            screen.blit(player_reversed_img, player.body.position-Vec2d(17,10))
+            screen.blit(player_reversed_img, (player.body.position-Vec2d(17,10))+camera_offset)
         else:
-            screen.blit(player_img, player.body.position-Vec2d(17,10))
+            screen.blit(player_img, (player.body.position-Vec2d(17,10))+camera_offset)
 
         for item in items:
             if item.body.position.y > HEIGHT:
@@ -185,7 +213,7 @@ def main(playerdirection):
                 print("Bottle collected!")
                 bottles_collected = bottles_collected + 1
             else:
-                screen.blit(bottle_img, item.body.position-Vec2d(17,20))
+                screen.blit(bottle_img, (item.body.position-Vec2d(17,20))+camera_offset)
 
         # Draw Player (using pymunk helper for simplicity)
         if debug:
@@ -199,4 +227,3 @@ def main(playerdirection):
 
 if __name__ == "__main__":
     main(playerdirection)
-
