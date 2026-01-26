@@ -13,7 +13,6 @@ args = parser.parse_args()
 debug = False
 if args.debug:
     debug = True
-
 # Configuration
 WIDTH, HEIGHT = 800, 600
 FPS = 120
@@ -28,8 +27,7 @@ zoo_level = [
     {"x": 100, "y": 500, "w": 600, "h": 50, "type": "block"}, # Floor
     {"x": 0,   "y": 400, "w": 300, "h": 50, "type": "block"}, # Platform
     {"x": 50,  "y": 450, "w": 300, "h": 50, "type": "block"}, # Step
-    {"x": 0,   "y": 300, "w": 300, "h": 50, "type": "block"}, # Roof
-    {"x": 428, "y": 350, "w": 75,  "h": 50, "type": "block"}, # platforming block
+    {"x": 0,   "y": 350, "w": 300, "h": 50, "type": "block"}, # Roof
 ]
 bottle_img = getimg("bottle.png")
 player_img = getimg("player.png")
