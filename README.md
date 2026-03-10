@@ -1,18 +1,7 @@
 # AppsForGood-Submission
 The Submission that we will send in. 
 
-```cpp
-#include <iostream>
 
-int main() {
-  std::cout << "Hello All" << std::endl;
-}
-
-```
-```python
-
-print("Hello world!");
-```
 
 
 
