@@ -69,24 +69,6 @@ shop_open = False
 playerdirection = False
 playerspeed = 200
 
-def checksqlserver():
-    try:
-        requests.get("https://localhost:8080")
-        return True
-    except requests.exceptions.ConnectionError:
-        return False
-
-def create_account(username, password, score, id):
-    if checksqlserver():
-        requests.post("https://localhost:8080", data=f"INSERT INTO accounts (username, password, score, id) VALUES ('{username}', '{password}', {score},{id})")
-
-def get_account(username, password):
-    if checksqlserver():
-        out = requests.post("https://localhost:8080", data=f"SELECT * FROM accounts WHERE username = '{username}' AND password = '{password}'")
-        print(out)
-
-
-
 def getimg(name):
     return pygame.image.load(
         os.path.join(os.path.dirname(os.path.abspath(__file__)), name))
@@ -562,7 +544,6 @@ def main(playerdirection, WIDTH, HEIGHT):
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     executor.submit(renderer, render)
     
-    get_account("","")
 
     # Physics Space
     space = pymunk.Space()
