@@ -69,6 +69,23 @@ shop_open = False
 playerdirection = False
 playerspeed = 200
 
+def checksqlserver():
+    try:
+        requests.get("https://localhost:8080")
+        return True
+    except requests.exceptions.ConnectionError:
+        return False
+
+def create_account(username, password, score, id):
+    if checksqlserver():
+        requests.post("https://localhost:8080", data=f"INSERT INTO accounts (username, password, score, id) VALUES ('{username}', '{password}', {score},{id})")
+
+def get_account(username, password):
+    if checksqlserver():
+        out = requests.post("https://localhost:8080", data=f"SELECT * FROM accounts WHERE username = '{username}' AND password = '{password}'")
+        print(out)
+
+
 
 def getimg(name):
     return pygame.image.load(
@@ -755,6 +772,11 @@ def main(playerdirection, WIDTH, HEIGHT):
         pygame.display.flip()
         clock.tick(FPS)
         fps = str(clock.get_fps())
+<<<<<<< HEAD
+=======
+
+    pygame.quit()
+>>>>>>> ea6627fc545abc6dfb63a7874e581232b58b28ae
     executor.shutdown(wait=True)
 
 if __name__ == "__main__":
@@ -765,4 +787,9 @@ if __name__ == "__main__":
     #      p = mp.Process(target=main, args=(playerdirection,))
     main(playerdirection, WIDTH, HEIGHT)
     #      p.start()
+<<<<<<< HEAD
     #      p.join()
+=======
+    #      p.join()
+
+>>>>>>> ea6627fc545abc6dfb63a7874e581232b58b28ae
