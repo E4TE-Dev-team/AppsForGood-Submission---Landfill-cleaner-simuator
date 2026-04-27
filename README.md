@@ -1,7 +1,9 @@
 # AppsForGood-Submission
-The Submission that we will send in. 
 
+>#
 ># Requirements:
->- ## pygame
->- ## pymunk
+>- ### [pygame](https://www.pygame.org)
+>     Can Be found On PyPi Or [here](https://github.com/pygame/pygame)
+>- ### [pymunk](http://www.pymunk.org/)
+>     Can Be Found On PyPi Or [here](https://github.com/viblo/pymunk)
 
