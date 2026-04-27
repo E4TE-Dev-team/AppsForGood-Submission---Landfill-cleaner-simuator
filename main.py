@@ -1,24 +1,35 @@
-#Upgrades:Better conversion rate for the coins, better items(new items) more item spawns (more items spawn), increase the amount of items that can spawn,
+#Upgrades:Better conversion rate for the coins, better items(new items)
 
-#Things to add: Add the shop, add the max items (limit the amount of items that can spawn), better framerate/optimization*, working shop, make conversion rate an upgradable thing.
-#*Optimization todo last but is important to do if gets laggy
+#Things to add: Add the shop, add the max items (limit the amount of items that can spawn), better framerate/optimization*, working shop, make conversion rate an upgradable thing
+
+#------WARNING------
+# I redid the rendering code so shop no work
+
+
 
 import os.path
 import argparse
 import random
 import enum
 import time
-# import math
+import concurrent.futures
+import requests
+#import math
 
 import pygame
 import pymunk
 import pymunk.pygame_util
 from pymunk import Poly, Vec2d
 import pymunk.bb
+
 import textbox
+import delay
+import animation
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--debug", help="debug mode", action="store_true")
+parser.add_argument("-u", "--username", help="Your username")
+parser.add_argument("-p", "--password", help="Your password")
 args = parser.parse_args()
 debug = False
 random.seed(0)
@@ -109,6 +120,9 @@ zoo_level = [
         "type": "block"
     },  # platforming block
 ]
+
+player_size = (45, 34)
+
 try:
     bottle_img = getimg("AFG/Bottle_texture.png")
 except FileNotFoundError:
@@ -135,10 +149,30 @@ except FileNotFoundError:
     print("404: Shop image not found.")
     shop_notscaled = pygame.Surface((34, 34))
 
+try:
+    player_walk_1 = pygame.transform.scale(getimg("AFG/character_true_sprite_gaster/chara_walk_1.png"), (45, 34))
+    player_walk_2 = pygame.transform.scale(getimg("AFG/character_true_sprite_gaster/chara_walk_2.png"), (45, 34))
+    player_walk_3 = pygame.transform.scale(getimg("AFG/character_true_sprite_gaster/chara_walk_3.png"), (45, 34))
+    player_walk_4 = pygame.transform.scale(getimg("AFG/character_true_sprite_gaster/chara_walk_4.png"), (45, 34))
+    player_walk_5 = pygame.transform.scale(getimg("AFG/character_true_sprite_gaster/chara_walk_5.png"), (45, 34))
+except FileNotFoundError:
+    player_walk_1 = pygame.Surface((45, 34))
+    player_walk_2 = pygame.Surface((45, 34))
+    player_walk_3 = pygame.Surface((45, 34))
+    player_walk_4 = pygame.Surface((45, 34))
+    player_walk_5 = pygame.Surface((45, 34))
+
 bottle_large_img = pygame.transform.scale(bottle_img, (100, 100))
 shop_img = pygame.transform.scale(shop_notscaled, (600, 400))
 player_img = pygame.transform.scale(player_img_large, (45, 34))
 player_reversed_img = pygame.transform.flip(player_img, True, False)
+
+player_reversed_walk_1 = pygame.transform.flip(player_walk_1, True, False)
+player_reversed_walk_2 = pygame.transform.flip(player_walk_2, True, False)
+player_reversed_walk_3 = pygame.transform.flip(player_walk_3, True, False)
+player_reversed_walk_4 = pygame.transform.flip(player_walk_4, True, False)
+player_reversed_walk_5 = pygame.transform.flip(player_walk_5, True, False)
+
 upgrades = [{
     "name": "CHEESE",
     "cost": 100,
@@ -175,31 +209,75 @@ upgrades = [{
 
 
 def create_structure(space, info):
-    """Creates static physical boundaries for the level."""
-    body = space.static_body
-    shape = pymunk.Poly.create_box(body, (info["w"], info["h"]))
-    # Pymunk uses center coordinates
-    shape.body.position = (info["x"] + info["w"] / 2,
-                           info["y"] + info["h"] / 2)
-    shape.elasticity = 0.5
-    shape.friction = 0.5
-    space.add(shape)
-    return shape
+  """Creates static physical boundaries for the level."""
+  body = space.static_body
+  shape = pymunk.Poly.create_box(body, (info["w"], info["h"]))
+  # Pymunk uses center coordinates
+  shape.body.position = (info["x"] + info["w"] / 2,
+                         info["y"] + info["h"] / 2)
+  shape.elasticity = 0.5
+  shape.friction = 0.5
+  space.add(shape)
+  return shape
 
 
 def create_player(space, pos):
-    """Creates a physics-enabled player circle."""
-    player_shape = [(11, 22), (-11, 22), (-11, -13), (11, -13)]
-    mass = 1
-    moment = pymunk.moment_for_poly(mass, player_shape)
-    body = pymunk.Body(mass, moment)
-    body.position = pos
-    body.angle = 0
-    shape = pymunk.Poly(body, player_shape)
-    shape.friction = 0.8
-    space.add(body, shape)
-    return shape
+  """Creates a physics-enabled player circle."""
+  player_shape = [(11, 22), (-11, 22), (-11, -13), (11, -13)]
+  mass = 1
+  moment = pymunk.moment_for_poly(mass, player_shape)
+  body = pymunk.Body(mass, moment)
+  body.position = pos
+  body.angle = 0
+  shape = pymunk.Poly(body, player_shape)
+  shape.friction = 0.8
+  space.add(body, shape)
+  return shape
 
+def create_bottle(space, pos: pymunk.Vec2d):
+  """Creates a physics-enabled bottle."""
+  mass = 1
+  bottle_shape = [(10, 10), (10, -10), (-10, -10), (-10, 10)]
+  moment = pymunk.moment_for_poly(mass, bottle_shape)
+  body = pymunk.Body(mass, moment)
+  body.position = pos
+  shape = pymunk.Poly(body, bottle_shape)
+  shape.friction = 0.8
+  space.add(body, shape)
+  twashstruct = Struct()
+  twashstruct.type = trashtypes.BOTTLE
+  twashstruct.shape = shape
+  return twashstruct
+
+
+def create_plate(space, pos: pymunk.Vec2d):
+  mass = 1
+  bottle_shape = [(10, 10), (10, -10), (-10, -10), (-10, 10)]
+  moment = pymunk.moment_for_poly(mass, bottle_shape)
+  body = pymunk.Body(mass, moment)
+  body.position = pos
+  shape = pymunk.Poly(body, bottle_shape)
+  shape.friction = 0.8
+  space.add(body, shape)
+  twashstruct = Struct()
+  twashstruct.type = trashtypes.RUSTYMETAL
+  twashstruct.shape = shape
+  return twashstruct
+
+
+def create_soda(space, pos: pymunk.Vec2d):
+  mass = 1
+  bottle_shape = [(7, 10), (7, -10), (-7, -10), (-7, 10)]
+  moment = pymunk.moment_for_poly(mass, bottle_shape)
+  body = pymunk.Body(mass, moment)
+  body.position = pos
+  shape = pymunk.Poly(body, bottle_shape)
+  shape.friction = 0.8
+  space.add(body, shape)
+  twashstruct = Struct()
+  twashstruct.type = trashtypes.SODA
+  twashstruct.shape = shape
+  return twashstruct
 
 def getinput(player_shape, isreversed, screen):
     """Handles movement: Left, Right, and Jump."""
@@ -229,53 +307,6 @@ def getinput(player_shape, isreversed, screen):
         testtext.HEIGHT = HEIGHT
         testtext.WIDTH = WIDTH
     return isreversed, testtext
-
-
-def create_bottle(space, pos: Vec2d):
-    """Creates a physics-enabled bottle."""
-    mass = 1
-    bottle_shape = [(10, 10), (10, -10), (-10, -10), (-10, 10)]
-    moment = pymunk.moment_for_poly(mass, bottle_shape)
-    body = pymunk.Body(mass, moment)
-    body.position = pos
-    shape = pymunk.Poly(body, bottle_shape)
-    shape.friction = 0.8
-    space.add(body, shape)
-    twashstruct = Struct()
-    twashstruct.type = trashtypes.BOTTLE
-    twashstruct.shape = shape
-    return twashstruct
-
-
-def create_plate(space, pos: Vec2d):
-    mass = 1
-    bottle_shape = [(10, 10), (10, -10), (-10, -10), (-10, 10)]
-    moment = pymunk.moment_for_poly(mass, bottle_shape)
-    body = pymunk.Body(mass, moment)
-    body.position = pos
-    shape = pymunk.Poly(body, bottle_shape)
-    shape.friction = 0.8
-    space.add(body, shape)
-    twashstruct = Struct()
-    twashstruct.type = trashtypes.RUSTYMETAL
-    twashstruct.shape = shape
-    return twashstruct
-
-
-def create_soda(space, pos: Vec2d):
-    mass = 1
-    bottle_shape = [(7, 10), (7, -10), (-7, -10), (-7, 10)]
-    moment = pymunk.moment_for_poly(mass, bottle_shape)
-    body = pymunk.Body(mass, moment)
-    body.position = pos
-    shape = pymunk.Poly(body, bottle_shape)
-    shape.friction = 0.8
-    space.add(body, shape)
-    twashstruct = Struct()
-    twashstruct.type = trashtypes.SODA
-    twashstruct.shape = shape
-    return twashstruct
-
 
 def physics(player, space, clock):
     """Updates the physics simulation."""
@@ -328,6 +359,164 @@ def twashthead(items, space):
     elif type == 3:
         items.append(create_soda(space, (random.randint(50, 780), 200)))
 
+def renderer(render):
+    for item in render:
+        item["func"](item["args"])
+
+def shop(shop_open, screen, WIDTH, HEIGHT, twash_coin, button_highlight, button_highlight_GEORGE, shop_open_delay, upgradearray_index, upgradearray_variable_index, bottles_collected, render):
+        mouse = Mouse()
+        mouse.x = pygame.mouse.get_pos()[0]
+        mouse.y = pygame.mouse.get_pos()[1]
+
+        #screen.fill((175, 175, 175))
+        render.append({"func" : screen.fill((175, 175, 175)), "args" : ((175, 175, 175))})
+        #pygame.draw.rect(screen, (101, 67, 33), (100, 100, 600, 400))
+        render.append({"func" : pygame.draw.rect(screen, (101, 67, 33), (100, 100, 600, 400)), "args" : (screen, (101, 67, 33), (100, 100, 600, 400))})
+        #pygame.draw.rect(screen, (101, 67, 33), (150, 150, 500, 300))
+        render.append({"func" : pygame.draw.rect(screen, (101, 67, 33), (150, 150, 500, 300)), "args" : (screen, (101, 67, 33), (150, 150, 500, 300))})
+        #pygame.draw.rect(screen, (101, 67, 33), (200, 200, 400, 200))
+        render.append({"func" : pygame.draw.rect(screen, (101, 67, 33), (200, 200, 400, 200)), "args" : (screen, (101, 67, 33), (200, 200, 400, 200))})
+        #pygame.draw.rect(screen, (101, 67, 33), (250, 250, 300, 100))
+        render.append({"func" : pygame.draw.rect(screen, (101, 67, 33), (250, 250, 300, 100)), "args" : (screen, (101, 67, 33), (250, 250, 300, 100))})
+        #pygame.draw.rect(screen, (101, 67, 33), (300, 300, 200, 50))
+        render.append({"func" : pygame.draw.rect(screen, (101, 67, 33), (300, 300, 200, 50)), "args" : (screen, (101, 67, 33), (300, 300, 200, 50))})
+        #screen.blit(shop_img, (100, 100))
+        render.append({"func" : screen.blit(shop_img, (100, 100)), "args" : (shop_img, (100, 100))})
+        font = pygame.font.Font(None, 16)
+        try:
+            name = font.render(upgrades[upgradearray_index]["name"], True,
+                               pygame.Color("white"))
+            desc = font.render(upgrades[upgradearray_index]["description"],
+                               True, pygame.Color("white"))
+            cost = font.render(str(upgrades[upgradearray_index]["cost"]),
+                               True, pygame.Color("white"))
+            name2 = font.render(upgrades[upgradearray_index + 1]["name"],
+                                True, pygame.Color("white"))
+            desc2 = font.render(
+                upgrades[upgradearray_index + 1]["description"], True,
+                pygame.Color("white"))
+            cost2 = font.render(
+                str(upgrades[upgradearray_index + 1]["cost"]), True,
+                pygame.Color("white"))
+        except:
+            print("No more upgrades!")
+            name = font.render("No more upgrades!", True,
+                               pygame.Color("white"))
+        try:
+            render.append({ "func" : screen.blit(upgrades[upgradearray_index]["texture"],
+                        (140, 180)), "args" : (upgrades[upgradearray_index]["texture"],
+                        (140, 180))})
+        except:
+            print("No more upgrades!")
+        #screen.blit(name, (250, 190))
+        render.append({"func" : screen.blit(name, (250, 190)), "args" : (name, (250, 190))})
+        #screen.blit(desc, (250, 200))
+        render.append({"func" : screen.blit(desc, (250, 200)), "args" : (desc, (250, 200))})
+        #screen.blit(cost, (250, 210))
+        render.append({"func" : screen.blit(cost, (250, 210)), "args" : (cost, (250, 210))})
+        try:
+            #screen.blit(upgrades[upgradearray_index + 1]["texture"],(440, 180))
+            render.append({"func" : screen.blit(upgrades[upgradearray_index + 1]["texture"],(440, 180)), "args" : (upgrades[upgradearray_index + 1]["texture"],(440, 180))})
+        except:
+            print("No more upgrades!")
+        #screen.blit(name2, (550, 190))
+        render.append({"func" : screen.blit(name2, (550, 190)), "args" : (name2, (550, 190))})
+        #screen.blit(desc2, (550, 200))
+        render.append({"func" : screen.blit(desc2, (550, 200)), "args" : (desc2, (550, 200))})
+        #screen.blit(cost2, (550, 210))
+        render.append({"func" : screen.blit(cost2, (550, 210)), "args" : (cost2, (550, 210))})
+
+        keys = pygame.key.get_pressed()
+        if pygame.mouse.get_pressed():
+            if mouse.x >= 140 and mouse.x <= 390 and mouse.y <= 480 and mouse.y >= 180:
+                try:
+                    if twash_coin >= upgrades[upgradearray_index]["cost"]:
+                        if shop_open_delay.isdelayed():
+                            if upgradearray_index == len(upgrades) - 1:
+                                print("No more upgrades!")
+                            else:
+                                print("Bought item!")
+                                twash_coin = twash_coin - upgrades[
+                            upgradearray_index]["cost"]
+                                for upgrade_var in upgrades[upgradearray_index][
+                                "var"]:
+                                    if upgrades[upgradearray_index]["type"][
+                                        upgradearray_variable_index] == upgradetypes.INCREMENT:
+                                        upgrades[upgradearray_index]["var"][
+                                    upgradearray_variable_index] = upgrades[
+                                        upgradearray_index]["var"][
+                                            upgradearray_variable_index] + upgrades[
+                                                upgradearray_index][
+                                                    "amountchanged"][
+                                                        upgradearray_variable_index]
+                                    elif upgrades[upgradearray_index]["type"][
+                                        upgradearray_variable_index] == upgradetypes.DECREMENT:
+                                        upgrades[upgradearray_index]["var"][
+                                    upgradearray_variable_index] = upgrades[
+                                        upgradearray_index]["var"][
+                                            upgradearray_variable_index] - upgrades[
+                                                upgradearray_index][
+                                                    "amountchanged"][
+                                                        upgradearray_variable_index]
+                                    elif upgrades[upgradearray_index]["type"][
+                                    upgradearray_variable_index] == upgradetypes.REDEFINE:
+                                        upgrades[upgradearray_index]["var"][
+                                    upgradearray_variable_index] = upgrades[
+                                        upgradearray_index][
+                                            "amountchanged"][
+                                                upgradearray_variable_index]
+                        upgradearray_index = upgradearray_index + 1
+                except:
+                    print("No more upgrades!")
+            if mouse.x >= 420 and mouse.x <= 690 and mouse.y <= 480 and mouse.y >= 180:
+                try:
+                    if twash_coin >= upgrades[upgradearray_index +
+                                              1]["cost"]:
+
+                        if upgradearray_index == len(upgrades) - 2:
+                            print("No more upgrades!")
+                        else:
+                            print("Bought item!")
+                            twash_coin = twash_coin - upgrades[
+                                upgradearray_index + 1]["cost"]
+                            for upgrade_var in upgrades[upgradearray_index
+                                                        + 1]["var"]:
+                                if upgrades[upgradearray_index + 1][
+                                        "type"] == upgradetypes.INCREMENT:
+                                    upgrades[upgradearray_index +
+                                             1]["var"] = upgrades[
+                                                 upgradearray_index +
+                                                 1]["var"] + upgrades[
+                                                     upgradearray_index +
+                                                     1]["amountchanged"]
+                                elif upgrades[upgradearray_index + 1][
+                                        "type"] == upgradetypes.DECREMENT:
+                                    upgrades[upgradearray_index +
+                                             1]["var"] = upgrades[
+                                                 upgradearray_index +
+                                                 1]["var"] - upgrades[
+                                                     upgradearray_index +
+                                                     1]["amountchanged"]
+                                elif upgrades[upgradearray_index + 1][
+                                        "type"] == upgradetypes.REDEFINE:
+                                    upgrades[upgradearray_index +
+                                             1]["var"] = upgrades[
+                                                 upgradearray_index +
+                                                 1]["amountchanged"]
+                            upgradearray_index = upgradearray_index + 1
+                except:
+                    print("No more upgrades!")
+        if mouse.x >= 140 and mouse.x <= 390 and mouse.y <= 480 and mouse.y >= 180:
+            #screen.blit(button_highlight, (140, 180))
+            render.append({"func" : screen.blit(button_highlight, (140, 180)), "args" : (button_highlight, (140, 180))})
+        if mouse.x >= 420 and mouse.x <= 690 and mouse.y <= 480 and mouse.y >= 180:
+            #screen.blit(button_highlight_GEORGE, (420, 180))
+            render.append({"func" : screen.blit(button_highlight_GEORGE, (420, 180)), "args" : (button_highlight_GEORGE, (420, 180))})
+
+        if bottles_collected >= 100 and keys[pygame.K_q]:
+            twash_coin = twash_coin + 1
+            bottles_collected = bottles_collected - 100
+
 
 def main(playerdirection, WIDTH, HEIGHT):
 
@@ -339,12 +528,24 @@ def main(playerdirection, WIDTH, HEIGHT):
     bottles_collected = 0
     twash_coin = 100
     shop_open = False
+    currentfps = clock.get_fps()
     button_highlight = pygame.Surface((250, 300))
     button_highlight.fill((255, 0, 0))
     button_highlight.set_alpha(128)
     button_highlight_GEORGE = pygame.Surface((240, 300))
     button_highlight_GEORGE.fill((255, 0, 0))
     button_highlight_GEORGE.set_alpha(128)
+    
+
+    player_walk_animation = animation.Animation([player_walk_1, player_walk_2, player_walk_3, player_walk_4, player_walk_5, player_walk_4, player_walk_3, player_walk_2], int((currentfps*100)))
+    player_walk_animation_reversed = animation.Animation([player_reversed_walk_1, player_reversed_walk_2, player_reversed_walk_3, player_reversed_walk_4, player_reversed_walk_5, player_reversed_walk_4, player_reversed_walk_3, player_reversed_walk_2], int((currentfps*100)))
+
+    # Rendering thread setup
+    render = []
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    executor.submit(renderer, render)
+    
+    get_account("","")
 
     # Physics Space
     space = pymunk.Space()
@@ -372,6 +573,9 @@ def main(playerdirection, WIDTH, HEIGHT):
             if event.type == pygame.QUIT:
                 running = False
 
+        render = []
+        shop_open_delay = delay.Delay((currentfps*0.6))
+        currentfps = clock.get_fps()
         # bottle spawning everyb 2 sec code:
         WIDTH, HEIGHT = pygame.display.get_surface().get_size(
         )[0], pygame.display.get_surface().get_size()[1]
@@ -404,12 +608,15 @@ def main(playerdirection, WIDTH, HEIGHT):
         if pygame.time.get_ticks() % 400 == 0:
             twashthead(items, space)
 
-        if keys[pygame.K_f]:
-            if shop_open:
-                shop_open = False
-            else:
-                shop_open = True
-            time.sleep(0.1)
+        shop_open_delay.total_delay = (currentfps*0.6)
+        if shop_open_delay.isdelayed():
+            if keys[pygame.K_f]:
+                if shop_open:
+                    shop_open = False
+                else:
+                    shop_open = True
+        else:
+            shop_open_delay.tick()
 
         # Jump logic: Coyote time and Variable jump height
         if keys[pygame.K_UP]:
@@ -430,23 +637,43 @@ def main(playerdirection, WIDTH, HEIGHT):
 
         if not shop_open:
 
-            screen.fill((199, 169, 84))  # Not So Sky Blue Blue
+            render.append({"func" : screen.fill((199, 169, 84)) ,"args": (199, 169, 84)})  # Not So Sky Blue Blue
 
             # Draw Platforms
             for item in zoo_level:
-                pygame.draw.rect(screen, (82, 82, 82),
+                render.append({"func" :pygame.draw.rect(screen, (82, 82, 82),
                                  (item["x"] + camera_offset.x, item["y"] +
-                                  camera_offset.y, item["w"], item["h"]))
-
+                                  camera_offset.y, item["w"], item["h"])) , "args" : (screen, (82, 82, 82),
+                               (item["x"] + camera_offset.x, item["y"] +
+                                camera_offset.y, item["w"], item["h"]))})
+            player_walk_animation.delay.total_delay = int(currentfps)
+            player_walk_animation_reversed.delay.total_delay = int(currentfps)
             if playerdirection:
-                screen.blit(player_reversed_img,
+                if not player.body.velocity.x <= -0.4:
+                    render.append({"func" : screen.blit(player_reversed_img,
                             (player.body.position - Vec2d(17, 10)) +
-                            camera_offset)
+                            camera_offset), "args" : (player_reversed_img,
+                            (player.body.position - Vec2d(17, 10)) +
+                            camera_offset) })
+                else:
+                    player_walk_animation_reversed.dotick()
+                    render.append({"func" : screen.blit(player_walk_animation_reversed.getframe(), (player.body.position - Vec2d(17, 10)) +
+                                camera_offset), "args" : (player_walk_animation_reversed.getframe(), (player.body.position - Vec2d(17, 10)) +
+                                camera_offset)})
             else:
-                screen.blit(player_img,
+                if player.body.velocity.x <= 0.4:
+                    render.append({"func" : screen.blit(player_img,
                             (player.body.position - Vec2d(17, 10)) +
-                            camera_offset)
-            #  screen.blit(bottle_large_img, player.body.position-Vec2d(60,110)+camera_offset)
+                        camera_offset), "args" : (player_img,
+                            (player.body.position - Vec2d(17, 10)) +
+                            camera_offset)})
+                else:
+                    player_walk_animation.dotick()
+                    render.append({"func" : screen.blit(player_walk_animation.getframe(), (player.body.position - Vec2d(17, 10)) + camera_offset), "args" : (player_walk_animation.getframe(), (player.body.position - Vec2d(17, 10)) + camera_offset)})
+            
+                                   
+                                   
+                    #  screen.blit(bottle_large_img, player.body.position-Vec2d(60,110)+camera_offset)
 
             for item in items:
                 if item.shape.body.position.y > HEIGHT:
@@ -468,162 +695,35 @@ def main(playerdirection, WIDTH, HEIGHT):
                     item.shape.body.angle = 0
                     item.shape.body.velocity = (0, item.shape.body.velocity.y)
                     if item.type == trashtypes.BOTTLE:
-                        screen.blit(
+                        render.append({"func" : screen.blit(
                             bottle_img,
                             (item.shape.body.position - Vec2d(17, 20)) +
-                            camera_offset)
+                            camera_offset), "args" : (bottle_img,
+                            (item.shape.body.position - Vec2d(17, 20)) +
+                            camera_offset)})
                     elif item.type == trashtypes.RUSTYMETAL:
-                        screen.blit(
+                        render.append({"func" : screen.blit(
                             rustymetal_img,
                             (item.shape.body.position - Vec2d(17, 20)) +
-                            camera_offset)
+                            camera_offset), "args" : (rustymetal_img,
+                            (item.shape.body.position - Vec2d(17, 20)) +
+                            camera_offset)})
                     elif item.type == trashtypes.SODA:
-                        screen.blit(
+                        render.append({"func" : screen.blit(
                             soda_img,
                             (item.shape.body.position - Vec2d(17, 20)) +
-                            camera_offset)
+                            camera_offset), "args" : (soda_img,
+                            (item.shape.body.position - Vec2d(17, 20)) +
+                            camera_offset)})
 
             # Draw Player (using pymunk helper for simplicity)
             if debug:
-                space.debug_draw(draw_options)
+                render.append({"func" : space.debug_draw(draw_options), "args" : (draw_options)})
             if keys[pygame.K_e]:
-                testtext.draw(screen)
+                render.append({"func" : testtext.draw(screen), "args" : (screen)})
 
         elif shop_open:
-            mouse = Mouse()
-            mouse.x = pygame.mouse.get_pos()[0]
-            mouse.y = pygame.mouse.get_pos()[1]
-
-            screen.fill((175, 175, 175))
-            pygame.draw.rect(screen, (101, 67, 33), (100, 100, 600, 400))
-            pygame.draw.rect(screen, (101, 67, 33), (150, 150, 500, 300))
-            pygame.draw.rect(screen, (101, 67, 33), (200, 200, 400, 200))
-            pygame.draw.rect(screen, (101, 67, 33), (250, 250, 300, 100))
-            pygame.draw.rect(screen, (101, 67, 33), (300, 300, 200, 50))
-            screen.blit(shop_img, (100, 100))
-            font = pygame.font.Font(None, 16)
-            try:
-                name = font.render(upgrades[upgradearray_index]["name"], True,
-                                   pygame.Color("white"))
-                desc = font.render(upgrades[upgradearray_index]["description"],
-                                   True, pygame.Color("white"))
-                cost = font.render(str(upgrades[upgradearray_index]["cost"]),
-                                   True, pygame.Color("white"))
-                name2 = font.render(upgrades[upgradearray_index + 1]["name"],
-                                    True, pygame.Color("white"))
-                desc2 = font.render(
-                    upgrades[upgradearray_index + 1]["description"], True,
-                    pygame.Color("white"))
-                cost2 = font.render(
-                    str(upgrades[upgradearray_index + 1]["cost"]), True,
-                    pygame.Color("white"))
-            except:
-                print("No more upgrades!")
-                name = font.render("No more upgrades!", True,
-                                   pygame.Color("white"))
-            try:
-                screen.blit(upgrades[upgradearray_index]["texture"],
-                            (140, 180))
-            except:
-                print("No more upgrades!")
-            screen.blit(name, (250, 190))
-            screen.blit(desc, (250, 200))
-            screen.blit(cost, (250, 210))
-            try:
-                screen.blit(upgrades[upgradearray_index + 1]["texture"],
-                            (440, 180))
-            except:
-                print("No more upgrades!")
-            screen.blit(name2, (550, 190))
-            screen.blit(desc2, (550, 200))
-            screen.blit(cost2, (550, 210))
-
-            keys = pygame.key.get_pressed()
-            if pygame.mouse.get_pressed():
-                if mouse.x >= 140 and mouse.x <= 390 and mouse.y <= 480 and mouse.y >= 180:
-                    if twash_coin >= upgrades[upgradearray_index]["cost"]:
-
-                        if upgradearray_index == len(upgrades) - 1:
-                            print("No more upgrades!")
-                        else:
-                            print("Bought item!")
-                            twash_coin = twash_coin - upgrades[
-                                upgradearray_index]["cost"]
-                            for upgrade_var in upgrades[upgradearray_index][
-                                    "var"]:
-                                if upgrades[upgradearray_index]["type"][
-                                        upgradearray_variable_index] == upgradetypes.INCREMENT:
-                                    upgrades[upgradearray_index]["var"][
-                                        upgradearray_variable_index] = upgrades[
-                                            upgradearray_index]["var"][
-                                                upgradearray_variable_index] + upgrades[
-                                                    upgradearray_index][
-                                                        "amountchanged"][
-                                                            upgradearray_variable_index]
-                                elif upgrades[upgradearray_index]["type"][
-                                        upgradearray_variable_index] == upgradetypes.DECREMENT:
-                                    upgrades[upgradearray_index]["var"][
-                                        upgradearray_variable_index] = upgrades[
-                                            upgradearray_index]["var"][
-                                                upgradearray_variable_index] - upgrades[
-                                                    upgradearray_index][
-                                                        "amountchanged"][
-                                                            upgradearray_variable_index]
-                                elif upgrades[upgradearray_index]["type"][
-                                        upgradearray_variable_index] == upgradetypes.REDEFINE:
-                                    upgrades[upgradearray_index]["var"][
-                                        upgradearray_variable_index] = upgrades[
-                                            upgradearray_index][
-                                                "amountchanged"][
-                                                    upgradearray_variable_index]
-                            upgradearray_index = upgradearray_index + 1
-                        time.sleep(0.6)
-                if mouse.x >= 420 and mouse.x <= 690 and mouse.y <= 480 and mouse.y >= 180:
-                    try:
-                        if twash_coin >= upgrades[upgradearray_index +
-                                                  1]["cost"]:
-
-                            if upgradearray_index == len(upgrades) - 2:
-                                print("No more upgrades!")
-                            else:
-                                print("Bought item!")
-                                twash_coin = twash_coin - upgrades[
-                                    upgradearray_index + 1]["cost"]
-                                for upgrade_var in upgrades[upgradearray_index
-                                                            + 1]["var"]:
-                                    if upgrades[upgradearray_index + 1][
-                                            "type"] == upgradetypes.INCREMENT:
-                                        upgrades[upgradearray_index +
-                                                 1]["var"] = upgrades[
-                                                     upgradearray_index +
-                                                     1]["var"] + upgrades[
-                                                         upgradearray_index +
-                                                         1]["amountchanged"]
-                                    elif upgrades[upgradearray_index + 1][
-                                            "type"] == upgradetypes.DECREMENT:
-                                        upgrades[upgradearray_index +
-                                                 1]["var"] = upgrades[
-                                                     upgradearray_index +
-                                                     1]["var"] - upgrades[
-                                                         upgradearray_index +
-                                                         1]["amountchanged"]
-                                    elif upgrades[upgradearray_index + 1][
-                                            "type"] == upgradetypes.REDEFINE:
-                                        upgrades[upgradearray_index +
-                                                 1]["var"] = upgrades[
-                                                     upgradearray_index +
-                                                     1]["amountchanged"]
-                                upgradearray_index = upgradearray_index + 1
-                    except:
-                        print("No more upgrades!")
-            if mouse.x >= 140 and mouse.x <= 390 and mouse.y <= 480 and mouse.y >= 180:
-                screen.blit(button_highlight, (140, 180))
-            if mouse.x >= 420 and mouse.x <= 690 and mouse.y <= 480 and mouse.y >= 180:
-                screen.blit(button_highlight_GEORGE, (420, 180))
-
-        if bottles_collected >= 100 and keys[pygame.K_q]:
-            twash_coin = twash_coin + 1
-            bottles_collected = bottles_collected - 100
+           shop(shop_open, screen, WIDTH, HEIGHT, twash_coin, button_highlight, button_highlight_GEORGE, shop_open_delay, upgradearray_index, upgradearray_variable_index, bottles_collected, render)
 
         # Display fps
         mouse = Mouse()
@@ -641,18 +741,21 @@ def main(playerdirection, WIDTH, HEIGHT):
         coin_text = font.render(Twash_coin, True, pygame.Color("black"))
         mouses_coods = font.render(mouse_coords, True, pygame.Color("black"))
         uptime_text = font.render(uptime, True, pygame.Color("black"))
-        screen.blit(text, (5, y))
-        screen.blit(bottle_text, (5, y + 10))
-        screen.blit(coin_text, (5, y + 20))
-        screen.blit(mouses_coods, (5, y + 30))
-        screen.blit(uptime_text, (5, y + 40))
+        render.append({"func" : screen.blit(text, (5, y)), "args" : (text, (5, y))})
+        #screen.blit(text, (5, y))
+        render.append({"func" : screen.blit(bottle_text, (5, y + 10)), "args" : (bottle_text, (5, y + 10))})
+        #screen.blit(bottle_text, (5, y + 10))
+        render.append({"func" : screen.blit(coin_text, (5, y + 20)), "args" : (coin_text, (5, y + 20))})
+        #screen.blit(coin_text, (5, y + 20))
+        render.append({"func" : screen.blit(mouses_coods, (5, y + 30)), "args" : (mouses_coods, (5, y + 30))})
+        #screen.blit(mouses_coods, (5, y + 30))
+        render.append({"func" : screen.blit(uptime_text, (5, y + 40)), "args" : (uptime_text, (5, y + 40))})
+        #screen.blit(uptime_text, (5, y + 40))
 
         pygame.display.flip()
         clock.tick(FPS)
         fps = str(clock.get_fps())
-
-    pygame.quit()
-
+    executor.shutdown(wait=True)
 
 if __name__ == "__main__":
     # executor = ThreadPoolExecutor(max_workers=1)
