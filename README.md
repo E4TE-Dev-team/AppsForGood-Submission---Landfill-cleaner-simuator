@@ -1,17 +1,7 @@
-# AppsForGood-Submission
+# AppsForGood-Submission - polyglot branch 
 
->#
-># Requirements:
->- ### [Python 3](https://www.python.org/downloads)
->     Can Be Found [Here](https://github.com/python/cpython/tree/3.14) Or At [The Offical Python Website](https://www.python.org/downloads)
->- ### [Pygame](https://www.pygame.org)
->     Can Be found On PyPi Or [Here](https://github.com/pygame/pygame)
->- ### [Pymunk](http://www.pymunk.org/)
->     Can Be Found On PyPi Or [Here](https://github.com/viblo/pymunk)
+use a mix of languages for this branch 
 
-
-># To Run:
-> ```bash
-> python3 main.py
-> ```
-
+Rust - physics - Rapier pysics engine
+C - Rendering, FFI and compat - SDL3 , CFFI
+python - game logic, sound and inputs - pygame
